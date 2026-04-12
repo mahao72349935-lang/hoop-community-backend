@@ -1,12 +1,33 @@
-### 1. 测试微信登录接口 (模拟失败情况)
+### 1. 触发后门，获取测试用户的 Token
 POST http://localhost:3000/api/v1/auth/wx-login
 Content-Type: application/json
 
 {
-  "code": "mock_code_123",
-  "nickName": "篮球少年",
+  "code": "mock_test_code",
+  "nickName": "无敌詹皇",
   "avatarUrl": "https://example.com/avatar.png"
 }
 
-### 2. 访问根路径
-GET http://localhost:3000/
+# -----------------------------------------------------
+# 【操作指南】：
+# 1. 点击上面接口的 Send Request。
+# 2. 在右侧结果里找到 "token": "eyJhbGci..." 这一长串字母。
+# 3. 把这串 token 复制下来，替换下面请求头里的【你的Token粘贴在这里】。
+# -----------------------------------------------------
+
+### 2. 发布我的第一场比赛！
+POST http://localhost:3000/api/v1/matches
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5ZGI5YjAyZjA0MDFmNjFhNzBlM2ZmZiIsImlhdCI6MTc3NjAwMDEwNSwiZXhwIjoxNzc2NjA0OTA1fQ.vZnuTP90DcIECIC-HhPfpyEEHYt2GXaIjFkVZKyJrOA
+
+{
+  "type": "walk_in",
+  "intensity": "养生局",
+  "venue": "609d201a0c4f1c1828f01b3a",
+  "timeSlotId": "609d201a0c4f1c1828f01b3b",
+  "scheduledDate": "2026-04-15",
+  "startTime": "19:00",
+  "endTime": "21:00",
+  "maxParticipants": 15,
+  "notes": "下班出出汗，和平打球，严禁垫脚！"
+}

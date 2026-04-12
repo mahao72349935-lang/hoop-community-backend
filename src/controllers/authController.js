@@ -19,7 +19,32 @@ exports.wxLogin = async (req, res, next) => {
 			return res.status(400).json({ success: false, message: '请提供微信 code' });
 		}
 
-		// 1. 调用微信 API 换取 openid
+		// ─── 【修复后的测试后门逻辑】 ────────────────────────────
+		if (code === 'mock_test_code') {
+			const mockOpenid = 'test_openid_888';
+			let user = await User.findOne({ openId: mockOpenid });
+
+			if (!user) {
+				user = await User.create({
+					openId: mockOpenid,
+					username: `wx_mock_${Date.now()}`,
+					password: 'default_mock_password',
+					nickname: nickName || '测试队长',
+					avatarUrl: avatarUrl || '',
+				});
+			}
+
+			const token = generateToken(user._id);
+			return res.status(200).json({
+				success: true,
+				message: '【Mock模式】登录成功',
+				token,
+				data: user,
+			});
+		}
+		// ───────────────────────────────────────────────────
+
+		// 1. 调用微信 API 换取 openid (真实流程)
 		const wxUrl = `https://api.weixin.qq.com/sns/jscode2session?appid=${process.env.WX_APP_ID}&secret=${process.env.WX_APP_SECRET}&js_code=${code}&grant_type=authorization_code`;
 
 		const wxResponse = await axios.get(wxUrl);
@@ -29,19 +54,19 @@ exports.wxLogin = async (req, res, next) => {
 			return res.status(400).json({ success: false, message: `微信登录失败: ${errmsg}` });
 		}
 
-		// 2. 查找用户是否存在，不存在则创建（自动注册）
-		let user = await User.findOne({ openid });
-
+		// 2. 查找用户是否存在，不存在则创建
+		let user = await User.findOne({ openId: openid });
 		if (!user) {
 			user = await User.create({
-				openid,
-				nickName,
+				openId: openid,
+				username: `wx_${openid.substring(0, 8)}_${Date.now()}`,
+				password: 'default_wx_password',
+				nickname: nickName,
 				avatarUrl,
-				// 其他体育数据初次创建时可留空，后续引导用户完善
 			});
 		}
 
-		// 3. 签发 Token（有效期半年）
+		// 3. 签发 Token
 		const token = generateToken(user._id);
 
 		res.status(200).json({

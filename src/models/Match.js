@@ -126,6 +126,31 @@ const matchSchema = new mongoose.Schema(
 			maxlength: [300, '备注不能超过300字'],
 			default: '', // 发起方填写的额外说明
 		},
+		tournamentId: {
+			type: mongoose.Schema.Types.ObjectId,
+			ref: 'Tournament',
+			default: null,
+		},
+
+		// ─── 赛制阶段 ──────────────────────────────────────────
+		round: {
+			type: String,
+			// group=小组赛  quarter=八强  semi=半决赛  final=决赛  quick=快速约赛
+			enum: ['quick', 'group', 'quarter', 'semi', 'final'],
+			default: 'quick',
+		},
+
+		// ─── 小组信息（小组赛阶段才有值） ─────────────────────
+		groupName: {
+			type: String,
+			default: null, // 'A组' / 'B组' / null
+		},
+
+		// ─── 对阵编号（生成对阵表、排序用） ───────────────────
+		matchNumber: {
+			type: Number,
+			default: null, // 例如：决赛是第15场
+		},
 	},
 	{ timestamps: true },
 );
@@ -134,5 +159,6 @@ const matchSchema = new mongoose.Schema(
 matchSchema.index({ venue: 1, scheduledDate: 1 }); // 按场地+日期查
 matchSchema.index({ 'initiator.team': 1, status: 1 }); // 按球队查我的约赛
 matchSchema.index({ status: 1, scheduledDate: 1 }); // 后台按状态+日期查
+matchSchema.index({ tournamentId: 1, round: 1 });
 
 module.exports = mongoose.model('Match', matchSchema);

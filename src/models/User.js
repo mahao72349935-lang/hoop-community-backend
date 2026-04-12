@@ -152,12 +152,15 @@ const userSchema = new mongoose.Schema(
 );
 
 // ─── 密码加密（保存前自动执行） ────────────────────────
-userSchema.pre('save', async function (next) {
-	if (!this.isModified('password') || !this.password) return next();
-	this.password = await bcrypt.hash(this.password, 12);
-	next();
-});
+// Mongoose 8+：async 中间件不要用 next()，由 Promise resolve/reject 驱动
+userSchema.pre('save', async function () {
+	if (!this.isModified('password')) {
+		return;
+	}
 
+	const salt = await bcrypt.genSalt(10);
+	this.password = await bcrypt.hash(this.password, salt);
+});
 // ─── 实例方法：校验密码 ────────────────────────────────
 userSchema.methods.correctPassword = async function (candidatePassword) {
 	return await bcrypt.compare(candidatePassword, this.password);

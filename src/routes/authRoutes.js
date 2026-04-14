@@ -1,9 +1,11 @@
 const express = require('express');
 const router = express.Router();
-// 引入上面写的逻辑控制器
-const { wxLogin } = require('../controllers/authController');
+const { register, login } = require('../controllers/authController');
 
-// 定义路径：当收到 POST 请求到 /register 时，执行 register 函数
-router.post('/wx-login', wxLogin);
+// 手机号 + 密码 注册（附带微信 code 静默绑定 openid）
+router.post('/register', register);
+
+// 手机号 + 密码 登录（附带微信 code 静默绑定 openid）
+router.post('/login', login);
 
 module.exports = router;

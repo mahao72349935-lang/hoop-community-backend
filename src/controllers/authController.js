@@ -1,6 +1,5 @@
 const axios = require('axios');
 const jwt = require('jsonwebtoken');
-const crypto = require('crypto');
 const User = require('../models/User');
 
 // 辅助函数：生成 JWT Token
@@ -10,102 +9,130 @@ const generateToken = (id) => {
 	});
 };
 
-// @desc    微信一键登录/注册
-// @route   POST /api/v1/auth/wx-login
-exports.wxLogin = async (req, res, next) => {
+// ─── 内部工具：静默换取微信 openid ────────────────────────────
+// 失败时返回 null，不抛异常，不阻断主流程
+const resolveWechatOpenid = async (wechatCode) => {
+	if (!wechatCode) return null;
 	try {
-		const { code, encryptedData, iv, nickName, avatarUrl } = req.body;
+		const wxUrl = `https://api.weixin.qq.com/sns/jscode2session?appid=${process.env.WX_APP_ID}&secret=${process.env.WX_APP_SECRET}&js_code=${wechatCode}&grant_type=authorization_code`;
+		const wxRes = await axios.get(wxUrl);
+		if (wxRes.data && wxRes.data.openid) {
+			return wxRes.data.openid;
+		}
+		console.warn('微信 code 换取 openid 失败:', wxRes.data.errmsg);
+	} catch (err) {
+		console.warn('微信接口请求异常，跳过 openid 绑定:', err.message);
+	}
+	return null;
+};
 
-		if (!code) {
-			return res.status(400).json({ success: false, message: '请提供微信 code' });
+// @desc    手机号 + 密码 注册
+// @route   POST /api/v1/auth/register
+exports.register = async (req, res, next) => {
+	try {
+		const { phone, password, wechatCode } = req.body;
+		console.log('%c [ req.body ]-34', 'font-size:13px; background:pink; color:#bf2c9f;', req.body)
+
+		if (!phone || !password) {
+			return res.status(400).json({ code: 400, success: false, message: '请提供手机号和密码' });
 		}
 
-		// ─── 【修复后的测试后门逻辑】 ────────────────────────────
-		if (code === 'mock_test_code') {
-			const mockOpenid = 'test_openid_888';
-			let user = await User.findOne({ openId: mockOpenid });
-
-			if (!user) {
-				user = await User.create({
-					openId: mockOpenid,
-					phone: '18629949036',
-					username: `wx_mock_${Date.now()}`,
-					password: 'default_mock_password',
-					nickname: nickName || '测试队长',
-					avatarUrl: avatarUrl || '',
-				});
-			} else if (!user.phone) {
-				user.phone = '18629949036';
-				await user.save();
-			}
-
-			const token = generateToken(user._id);
-			return res.status(200).json({
-				success: true,
-				message: '【Mock模式】登录成功',
-				token,
-				data: user,
-			});
-		}
-		// ───────────────────────────────────────────────────
-
-		// 1. 调用微信 API 换取 openid 和 session_key (真实流程)
-		const wxUrl = `https://api.weixin.qq.com/sns/jscode2session?appid=${process.env.WX_APP_ID}&secret=${process.env.WX_APP_SECRET}&js_code=${code}&grant_type=authorization_code`;
-
-		const wxResponse = await axios.get(wxUrl);
-		const { openid, session_key, errmsg } = wxResponse.data;
-
-		if (!openid) {
-			return res.status(400).json({ success: false, message: `微信登录失败: ${errmsg}` });
+		// 检查手机号是否已被注册
+		const existing = await User.findOne({ phone });
+		if (existing) {
+			return res.status(409).json({ code: 409, success: false, message: '该手机号已注册，请直接登录' });
 		}
 
-		// 若有授权手机号的数据，则尝试解密以提取手机号
-		let phone = undefined;
-		if (encryptedData && iv && session_key) {
-			try {
-				const sessionKeyBuffer = Buffer.from(session_key, 'base64');
-				const encryptedDataBuffer = Buffer.from(encryptedData, 'base64');
-				const ivBuffer = Buffer.from(iv, 'base64');
+		// 静默换取微信 openid（失败不阻断注册）
+		let wechatOpenid = await resolveWechatOpenid(wechatCode);
 
-				const decipher = crypto.createDecipheriv('aes-128-cbc', sessionKeyBuffer, ivBuffer);
-				decipher.setAutoPadding(true);
-				let decoded = decipher.update(encryptedDataBuffer, 'binary', 'utf8');
-				decoded += decipher.final('utf8');
-				decoded = JSON.parse(decoded);
-
-				if (decoded.watermark && decoded.watermark.appid === process.env.WX_APP_ID) {
-					phone = decoded.purePhoneNumber || decoded.phoneNumber;
-				}
-			} catch (decodeErr) {
-				console.error('微信手机号解密失败:', decodeErr);
-				// 当解密失败时，可以只抛出警告而不阻断登录
+		// 若 openid 已被其他账号绑定，则放弃绑定（不阻止注册）
+		if (wechatOpenid) {
+			const openidConflict = await User.findOne({ openId: wechatOpenid });
+			if (openidConflict) {
+				console.warn(`openid ${wechatOpenid} 已被用户 ${openidConflict._id} 绑定，本次注册跳过 openid 绑定`);
+				wechatOpenid = null;
 			}
 		}
 
-		// 2. 查找用户是否存在，不存在则创建
-		let user = await User.findOne({ openId: openid });
-		if (!user) {
-			user = await User.create({
-				openId: openid,
-				phone: phone,
-				username: `wx_${openid.substring(0, 8)}_${Date.now()}`,
-				password: 'default_wx_password',
-				nickname: nickName,
-				avatarUrl,
-			});
-		} else if (phone && !user.phone) {
-			// 更新老用户之前没有的手机号
-			user.phone = phone;
-			await user.save();
-		}
+		const newUser = await User.create({
+			phone,
+			password,
+			username: `user_${phone.slice(-4)}_${Date.now()}`, // 默认用户名，后续可在个人信息页修改
+			...(wechatOpenid ? { openId: wechatOpenid } : {}),
+		});
 
-		// 3. 签发 Token
-		const token = generateToken(user._id);
+		const token = generateToken(newUser._id);
+		const userInfo = newUser.toObject();
+		delete userInfo.password;
 
-		res.status(200).json({
+		return res.status(200).json({
+			code: 200,
 			success: true,
-			token,
-			data: user,
+			message: '注册成功',
+			data: {
+				userInfo,
+				accessToken: token,
+			},
+		});
+	} catch (err) {
+		next(err);
+	}
+};
+
+// @desc    手机号 + 密码 登录（附带微信 code 静默绑定 openid）
+// @route   POST /api/v1/auth/login
+exports.login = async (req, res, next) => {
+	try {
+		const { phone, password, wechatCode } = req.body;
+
+		if (!phone || !password) {
+			return res.status(400).json({ code: 400, success: false, message: '请提供手机号和密码' });
+		}
+
+		// 查找用户（select +password 因为 schema 中设了 select: false）
+		const user = await User.findOne({ phone }).select('+password');
+		if (!user) {
+			return res.status(401).json({ code: 401, success: false, message: '手机号未注册' });
+		}
+
+		if (!user.password) {
+			return res.status(401).json({ code: 401, success: false, message: '该账号未设置密码，请使用其他方式登录' });
+		}
+
+		const isMatch = await user.correctPassword(password);
+		if (!isMatch) {
+			return res.status(401).json({ code: 401, success: false, message: '密码错误' });
+		}
+
+		// 静默换取微信 openid，若用户尚未绑定则顺手绑定
+		if (!user.openId) {
+			const wechatOpenid = await resolveWechatOpenid(wechatCode);
+			if (wechatOpenid) {
+				const openidConflict = await User.findOne({ openId: wechatOpenid });
+				if (!openidConflict) {
+					user.openId = wechatOpenid;
+				} else {
+					console.warn(`openid ${wechatOpenid} 已被用户 ${openidConflict._id} 绑定，跳过本次绑定`);
+				}
+			}
+		}
+
+		user.lastLoginAt = new Date();
+		await user.save();
+
+		const token = generateToken(user._id);
+		const userInfo = user.toObject();
+		delete userInfo.password;
+
+		return res.status(200).json({
+			code: 200,
+			success: true,
+			message: '登录成功',
+			data: {
+				userInfo,
+				accessToken: token,
+			},
 		});
 	} catch (err) {
 		next(err);

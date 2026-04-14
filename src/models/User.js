@@ -81,10 +81,9 @@ const userSchema = new mongoose.Schema(
 				likes: { type: Number, default: 0 }, // 其他人点赞这个绰号
 			},
 		],
-		age: {
-			type: Number,
-			min: [5, '年龄太小了'],
-			max: [100, '年龄超限'],
+		birthday: {
+			type: Date,
+			default: null,
 		},
 		height: { type: Number }, // 单位：cm
 		weight: { type: Number }, // 单位：kg
@@ -94,13 +93,24 @@ const userSchema = new mongoose.Schema(
 		},
 		position: {
 			type: String,
-			enum: ['控卫', '得分后卫', '小前锋', '大前锋', '中锋', '自由人', '未设置'],
-			default: '未设置',
+			enum: [
+				'UNKNOWN', // 未设置
+				'PG', // 控球后卫
+				'SG', // 得分后卫
+				'SF', // 小前锋
+				'PF', // 大前锋
+				'C', // 中锋
+				'GF', // 锋卫摇摆人
+				'F', // 前锋摇摆人
+				'CPF', // 内线摇摆人
+				'ALL', // 不固定/全能位
+			],
+			default: 'UNKNOWN',
 		},
 		preferredIntensity: {
 			type: String,
-			enum: ['养生局', '强度局', '专业局', '未设置'],
-			default: '未设置', // 偏好的球局强度
+			enum: ['UNKNOWN', 'CASUAL', 'MODERATE', 'COMPETITIVE'],
+			default: 'UNKNOWN',
 		},
 		hasInjury: {
 			type: Boolean,

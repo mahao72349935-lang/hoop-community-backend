@@ -79,8 +79,8 @@ const teamSchema = new mongoose.Schema(
 		},
 		preferredIntensity: {
 			type: String,
-			enum: ['养生局', '强度局', '专业局', '不限'],
-			default: '不限', // 球队整体偏好强度，约赛时展示给对方看
+			enum: ['ANY', 'CASUAL', 'MODERATE', 'COMPETITIVE'],
+			default: 'ANY', // 球队整体偏好强度
 		},
 
 		// ─── 地区 ──────────────────────────────────────────

@@ -2,6 +2,13 @@
 // 注意：Express 的错误处理中间件必须严格包含 4 个参数 (err, req, res, next)
 // 只有写了 4 个参数，Express 才会认出这是一个错误处理中间件
 const errorHandler = (err, req, res, next) => {
+	// Mongoose 校验错误 → 统一为 400 与可读文案
+	if (err.name === 'ValidationError' && err.errors) {
+		const messages = Object.values(err.errors).map((val) => val.message);
+		err.statusCode = 400;
+		err.message = messages.join(', ');
+	}
+
 	// 1. 打印错误日志到终端，方便后端开发者排查问题
 	console.error('【系统报错】:', err.stack);
 

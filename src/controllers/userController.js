@@ -1,22 +1,44 @@
+const mongoose = require('mongoose');
 const User = require('../models/User');
 
 // ─── 允许用户更新的字段白名单 ─────────────────────────
-const ALLOWED_UPDATE_FIELDS = ['realName', 'nickname', 'yearsOfPlaying', 'position', 'preferredIntensity', 'hasInjury', 'injuryDetails', 'region'];
+const ALLOWED_UPDATE_FIELDS = ['realName', 'nickname', 'birthday', 'yearsOfPlaying', 'position', 'preferredIntensity', 'hasInjury', 'injuryDetails', 'region'];
 
-// @desc    获取当前登录用户的个人信息
+/** 查看「他人」资料时不返回的敏感字段（联系方式与登录标识） */
+const stripOtherUserPrivateFields = (obj) => {
+	delete obj.phone;
+	delete obj.openId;
+	delete obj.lastLoginAt;
+};
+
+// @desc    获取用户信息：不传 userId → 当前登录用户（由 Token 决定）；?userId= → 指定用户（脱敏）
 // @route   GET /api/v1/user/profile/info
 // @access  Private（需要 Token）
 exports.getUserInfo = async (req, res, next) => {
 	try {
-		const user = await User.findById(req.user._id);
+		let targetId = req.user._id;
+		const { userId: queryUserId } = req.query;
+
+		if (queryUserId) {
+			if (!mongoose.Types.ObjectId.isValid(queryUserId)) {
+				return res.status(400).json({ code: 400, success: false, message: 'userId 格式无效' });
+			}
+			targetId = queryUserId;
+		}
+
+		const user = await User.findById(targetId);
 
 		if (!user) {
 			return res.status(404).json({ code: 404, success: false, message: '用户不存在' });
 		}
 
 		const userInfo = user.toObject();
-		// 绝不向前端泄漏密码
 		delete userInfo.password;
+
+		const isSelf = String(user._id) === String(req.user._id);
+		if (!isSelf) {
+			stripOtherUserPrivateFields(userInfo);
+		}
 
 		return res.status(200).json({
 			code: 200,
@@ -127,6 +149,7 @@ exports.updateUserInfo = async (req, res, next) => {
 				province: String(updates.region.province || ''),
 				city: String(updates.region.city || ''),
 				district: String(updates.region.district || ''),
+				detail: String(updates.region.detail || ''),
 			};
 		}
 

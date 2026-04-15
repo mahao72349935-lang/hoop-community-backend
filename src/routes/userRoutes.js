@@ -10,6 +10,6 @@ router.use(protect);
 router.get('/profile/info', getUserInfo);
 
 // 更新当前用户信息
-router.put('/info', updateUserInfo);
+router.post('/updateUserInfo', updateUserInfo);
 
 module.exports = router;

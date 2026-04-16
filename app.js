@@ -17,6 +17,7 @@ connectDB();
 const authRoutes = require('./src/routes/authRoutes');
 const matchRoutes = require('./src/routes/matchRoutes');
 const userRoutes = require('./src/routes/userRoutes');
+const teamRoutes = require('./src/routes/teamRoutes');
 // 挂载日志系统，记录每一次请求
 app.use(morgan('dev'));
 
@@ -47,6 +48,7 @@ app.get('/test-error', (req, res, next) => {
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/matches', matchRoutes);
 app.use('/api/v1/user', userRoutes);
+app.use('/api/v1/team', teamRoutes);
 // ==========================================
 // 3. 全局后置中间件 (流水线的末端：兜底)
 // ==========================================

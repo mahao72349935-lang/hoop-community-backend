@@ -6,8 +6,8 @@ const { createTeam, updateTeam } = require('../services/teamService');
 exports.createTeam = async (req, res, next) => {
 	try {
 		const newTeam = await createTeam({ ...req.body, userId: req.user._id });
-		return res.status(201).json({
-			code: 201,
+		return res.status(200).json({
+			code: 200,
 			success: true,
 			message: '球队创建成功',
 			data: newTeam,

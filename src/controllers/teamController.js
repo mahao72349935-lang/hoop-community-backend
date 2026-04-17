@@ -1,4 +1,4 @@
-const teamService = require('../services/teamService');
+const teamService = require('../services/team');
 const { ok, created, noContent } = require('../utils/response');
 
 // @desc    创建球队

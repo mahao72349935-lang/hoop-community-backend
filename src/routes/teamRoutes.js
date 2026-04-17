@@ -8,5 +8,6 @@ router.use(protect);
 // 创建球队
 router.post('/createTeam', createTeam);
 router.post('/updateTeam', updateTeam);
+router.get('/getJoinTeamList', getJoinTeamList);
 
 module.exports = router;

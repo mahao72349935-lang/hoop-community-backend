@@ -72,3 +72,15 @@ exports.getTeamDetail = async (req, res, next) => {
 		next(err);
 	}
 };
+
+// 获取所有球队列表
+// @route   GET /api/v1/teams
+// @access  Private
+exports.getAllTeams = async (req, res, next) => {
+	try {
+		const teams = await teamService.getList();
+		return ok(res, teams, '获取所有球队列表成功');
+	} catch (err) {
+		next(err);
+	}
+};

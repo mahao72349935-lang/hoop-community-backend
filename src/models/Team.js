@@ -1,5 +1,20 @@
 const mongoose = require('mongoose');
 const { Schema } = mongoose;
+const { TEAM_TAGS } = require('../constants/teamTags');
+
+// ─── 社交标签子文档 ─────────────────────────────
+const tagSchema = new Schema(
+	{
+		key: {
+			type: String,
+			required: true,
+			enum: TEAM_TAGS.map((t) => t.key), // 只能是预设的几种
+		},
+		// 谁投了这个标签
+		voters: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+	},
+	{ _id: false, timestamps: true },
+);
 
 // ─── 绰号子文档 ──────────────────────────────────
 const nicknameSchema = new Schema(
@@ -23,20 +38,35 @@ const nicknameSchema = new Schema(
 );
 
 // ─── 成员子文档 ──────────────────────────────────
-const memberSchema = new Schema({
-	user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-	role: {
-		type: String,
-		enum: ['captain', 'vice_captain', 'member'],
-		default: 'member',
+const memberSchema = new Schema(
+	{
+		user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+		role: {
+			type: String,
+			enum: ['captain', 'vice_captain', 'member'],
+			default: 'member',
+		},
+		joinedAt: { type: Date, default: Date.now },
+		teamStats: {
+			games: { type: Number, default: 0 },
+			wins: { type: Number, default: 0 },
+			losses: { type: Number, default: 0 },
+		},
 	},
-	joinedAt: { type: Date, default: Date.now },
-	teamStats: {
-		games: { type: Number, default: 0 },
-		wins: { type: Number, default: 0 },
-		losses: { type: Number, default: 0 },
+	{
+		timestamps: true,
+		toJSON: {
+			virtuals: true,
+			versionKey: false,
+			transform: (doc, ret) => {
+				ret.memberId = ret._id.toString();
+				delete ret._id;
+				return ret;
+			},
+		},
+		toObject: { virtuals: true, versionKey: false },
 	},
-});
+);
 
 // ─── 球队主 Schema ──────────────────────────────
 const teamSchema = new Schema(
@@ -79,6 +109,10 @@ const teamSchema = new Schema(
 			draws: { type: Number, default: 0 },
 		},
 		status: { type: String, enum: ['active', 'disbanded'], default: 'active' },
+		tags: {
+			type: [tagSchema],
+			default: [],
+		},
 	},
 	{
 		timestamps: true,
@@ -105,6 +139,22 @@ teamSchema.virtual('winRate').get(function () {
 
 teamSchema.virtual('memberCount').get(function () {
 	return this.members.length;
+});
+
+// 被承认的社交标签（至少 2 人投过）
+teamSchema.virtual('displayTags').get(function () {
+	return this.tags
+		.filter((t) => t.voters.length >= 2)
+		.map((t) => {
+			const meta = TEAM_TAGS.find((m) => m.key === t.key);
+			return {
+				key: t.key,
+				label: meta?.label || t.key,
+				emoji: meta?.emoji || '',
+				count: t.voters.length,
+			};
+		})
+		.sort((a, b) => b.count - a.count);
 });
 
 module.exports = mongoose.model('Team', teamSchema);

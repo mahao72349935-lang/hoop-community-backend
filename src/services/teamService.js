@@ -6,7 +6,6 @@ const AppError = require('../utils/AppError');
 
 // ─── 常量 ────────────────────────────────────────────
 const MAX_TEAMS_PER_USER = 5; // 每人最多加入球队数（按需调整）
-const MAX_MEMBERS_PER_TEAM = 15; // 与 schema 保持一致
 const ALLOWED_TEAM_UPDATES = ['name', 'logoUrl', 'description', 'preferredIntensity', 'region'];
 
 // ─── 工具函数 ────────────────────────────────────────
@@ -172,4 +171,130 @@ exports.getDetail = async ({ userId, teamId }) => {
 	]);
 
 	return team;
+};
+
+// 获取所有球队列表
+/**
+ * @param  params
+ */
+exports.getList = async ({
+	page = 1,
+	size = 10,
+	keyword,
+	city,
+	intensity,
+	sort = 'latest', // latest | hot | winRate
+} = {}) => {
+	const pageNum = Math.max(Number(page) || 1, 1);
+	const pageSize = Math.min(Math.max(Number(size) || 10, 1), 50); // 每页最多 50
+	const skip = (pageNum - 1) * pageSize;
+
+	// ─── 构造 filter ─────────────────────────────
+	const filter = { status: 'active' };
+
+	if (keyword) {
+		// 模糊搜索队名（转义正则特殊字符防注入）
+		const safe = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+		filter.name = { $regex: safe, $options: 'i' };
+	}
+
+	if (city) filter['region.city'] = city;
+
+	if (intensity && intensity !== 'ANY') {
+		filter.preferredIntensity = intensity;
+	}
+
+	// ─── 构造 sort ───────────────────────────────
+	const sortMap = {
+		latest: { createdAt: -1 },
+		hot: { 'stats.totalMatches': -1, updatedAt: -1 },
+		winRate: { 'stats.wins': -1 }, // 简单按胜场，想要真胜率排序走聚合
+	};
+	const sortOption = sortMap[sort] || sortMap.latest;
+
+	// ─── 并行查列表 + 总数 ───────────────────────
+	const [list, total] = await Promise.all([
+		Team.find(filter).select('name logoUrl description preferredIntensity region members stats').sort(sortOption).skip(skip).limit(pageSize),
+		Team.countDocuments(filter),
+	]);
+
+	return {
+		list,
+		pagination: {
+			page: pageNum,
+			size: pageSize,
+			total,
+			totalPages: Math.ceil(total / pageSize),
+			hasMore: skip + list.length < total,
+		},
+	};
+};
+
+/**
+ * 计算球队的系统标签
+ */
+const computeSystemTags = (team) => {
+	const tags = [];
+	const now = Date.now();
+	const created = new Date(team.createdAt).getTime();
+	const updated = new Date(team.updatedAt).getTime();
+
+	// 新球队
+	if (now - created <= SEVEN_DAYS_MS) {
+		tags.push({ key: 'new', label: '新球队', emoji: '🆕' });
+	}
+
+	// 最近活跃
+	if (now - updated <= THIRTY_DAYS_MS) {
+		tags.push({ key: 'active', label: '最近活跃', emoji: '⚡' });
+	}
+
+	// 常打球（假设场次较多）
+	if (team.stats?.totalMatches >= 10) {
+		tags.push({ key: 'frequent', label: '常打球', emoji: '🔥' });
+	}
+
+	// 还招人
+	if (team.members.length < 15) {
+		tags.push({ key: 'recruiting', label: '还招人', emoji: '👋' });
+	}
+
+	return tags;
+};
+
+/**
+ * 给单个 team 补齐展示用的 allTags（系统 + 社交）
+ */
+const attachTags = (team) => {
+	const obj = team.toJSON ? team.toJSON() : team;
+	obj.systemTags = computeSystemTags(obj);
+	// displayTags 是 virtual，toJSON 已经有了
+	obj.allTags = [...obj.systemTags, ...(obj.displayTags || [])];
+	return obj;
+};
+
+exports.getDetail = async ({ userId, teamId }) => {
+	const { team } = await assertTeamMember({ teamId, userId });
+	return attachTags(team);
+};
+
+exports.getFeatured = async ({ count = 3 } = {}) => {
+	const teams = await Team.find({ status: 'active' }).sort({ updatedAt: -1 }).limit(count);
+	return teams.map(attachTags);
+};
+
+// 精选球队
+exports.getFeatured = async ({ count = 3 } = {}) => {
+	const limit = Number(count) || 3;
+
+	// 球队少的时候，直接按"信息完整度 + 最近更新"返回
+	const teams = await Team.find({
+		status: 'active',
+		// 至少要有队徽或简介，不然首页太空
+		$or: [{ logoUrl: { $ne: '' } }, { description: { $ne: '' } }],
+	})
+		.sort({ updatedAt: -1 })
+		.limit(limit);
+
+	return teams.map(attachTags);
 };

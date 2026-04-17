@@ -1,33 +1,39 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const AppError = require('../utils/AppError');
 
-// 保护路由的中间件
 exports.protect = async (req, res, next) => {
-	let token;
-
-	// 1. 从请求头中提取 Token（Authorization: Bearer xxxx）
-	if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-		token = req.headers.authorization.split(' ')[1];
-	}
-
-	if (!token) {
-		return res.status(401).json({ success: false, message: '未登录，请先登录' });
-	}
-
 	try {
-		// 2. 验证 Token 是否合法 / 是否过期
+		// 1. 从请求头提取 token
+		const authHeader = req.headers.authorization;
+		if (!authHeader || !authHeader.startsWith('Bearer ')) {
+			throw new AppError('未登录，请先登录', 401);
+		}
+		const token = authHeader.split(' ')[1];
+		if (!token) throw new AppError('未登录，请先登录', 401);
+
+		// 2. 验证 token（不合法/过期会抛错，走下面 catch）
 		const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-		// 3. 根据 Token 里的 id 查询用户
-		const user = await User.findById(decoded.id);
-		if (!user) {
-			return res.status(401).json({ success: false, message: 'Token 对应的用户不存在' });
-		}
+		// 3. 兼容两种签发 key（id 或 userId），迁移期很方便
+		const userId = decoded.id || decoded.userId;
+		if (!userId) throw new AppError('Token 无效', 401);
 
-		// 4. 挂载到 req，供后续 Controller 使用（password 在 Schema 中 select: false，不会返回）
+		// 4. 查用户
+		const user = await User.findById(userId);
+		if (!user) throw new AppError('Token 对应的用户不存在', 401);
+
+		// 5. 挂到 req 上
 		req.user = user;
 		next();
 	} catch (err) {
-		return res.status(401).json({ success: false, message: 'Token 无效或已过期' });
+		// 区分 JWT 自带的错误类型，给前端更精确的提示
+		if (err.name === 'TokenExpiredError') {
+			return next(new AppError('登录已过期，请重新登录', 401));
+		}
+		if (err.name === 'JsonWebTokenError') {
+			return next(new AppError('Token 无效', 401));
+		}
+		next(err);
 	}
 };

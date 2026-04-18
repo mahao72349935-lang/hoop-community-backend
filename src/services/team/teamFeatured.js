@@ -13,6 +13,7 @@ exports.getFeatured = async ({ count = 3 } = {}) => {
 		// 至少有队徽或简介，避免首页空洞
 		$or: [{ logoUrl: { $nin: ['', null] } }, { description: { $nin: ['', null] } }],
 	})
+		.populate({ path: 'members.user', select: 'gender' })
 		.sort({ updatedAt: -1 })
 		.limit(limit);
 

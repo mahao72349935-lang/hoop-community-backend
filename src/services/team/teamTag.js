@@ -28,5 +28,6 @@ exports.voteTag = async ({ userId, teamId, tagKey }) => {
 	}
 
 	await team.save();
+	await team.populate({ path: 'members.user', select: 'gender' });
 	return attachTags(team);
 };

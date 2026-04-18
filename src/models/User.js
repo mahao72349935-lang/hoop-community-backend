@@ -55,6 +55,11 @@ const userSchema = new mongoose.Schema(
 			type: Date,
 			default: null, // 建议存储生日而非年龄
 		},
+		gender: {
+			type: String,
+			enum: ['unknown', 'male', 'female'],
+			default: 'unknown',
+		},
 		height: { type: Number }, // cm
 		weight: { type: Number }, // kg
 		yearsOfPlaying: {

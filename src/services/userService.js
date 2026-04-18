@@ -5,6 +5,7 @@ const AppError = require('../utils/AppError');
 const ALLOWED_UPDATE_FIELDS = [
 	'realName',
 	'nickname',
+	'gender',
 	'birthday',
 	'yearsOfPlaying',
 	'position',

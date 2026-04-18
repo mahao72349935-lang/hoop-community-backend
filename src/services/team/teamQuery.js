@@ -24,6 +24,7 @@ exports.getList = async ({ page = 1, size = 10, keyword, city, intensity, sort =
 	const [list, total] = await Promise.all([
 		Team.find(filter)
 			.select('name logoUrl description preferredIntensity region members stats tags')
+			.populate({ path: 'members.user', select: 'gender' })
 			.sort(sortMap[sort] || sortMap.latest)
 			.skip(skip)
 			.limit(pageSize),

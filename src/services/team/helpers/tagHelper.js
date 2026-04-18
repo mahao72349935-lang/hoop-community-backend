@@ -3,6 +3,12 @@ const { TEAM_TAGS } = require('../../../constants/teamTags');
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
+const teamHasFemaleMember = (members) =>
+	(members || []).some((m) => {
+		const u = m?.user;
+		return u != null && typeof u === 'object' && u.gender === 'female';
+	});
+
 /**
  * 根据球队数据算出系统标签（不写库，展示用）
  */
@@ -23,6 +29,9 @@ const computeSystemTags = (team) => {
 	}
 	if ((team.members?.length || 0) < 15) {
 		tags.push({ key: 'recruiting', label: '还招人' });
+	}
+	if (teamHasFemaleMember(team.members)) {
+		tags.push({ key: 'hasFemale', label: '有妹子' });
 	}
 	return tags;
 };

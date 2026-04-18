@@ -76,7 +76,7 @@ exports.getDetail = async ({ teamId }) => {
 	const team = await Team.findById(teamId);
 	if (!team) throw new Error('球队不存在');
 	await team.populate([
-		{ path: 'members.user', select: 'nickname avatar' },
+		{ path: 'members.user', select: 'nickname avatar gender' },
 		{ path: 'nicknames.targetUser', select: 'nickname avatar' },
 		{ path: 'nicknames.nominatedBy', select: 'nickname avatar' },
 	]);
@@ -90,6 +90,7 @@ exports.getJoinList = async ({ userId }) => {
 		status: 'active',
 	})
 		.select('name logoUrl description preferredIntensity region members stats inviteCode tags')
+		.populate({ path: 'members.user', select: 'gender' })
 		.sort({ updatedAt: -1 });
 
 	return teams.map(attachTags);

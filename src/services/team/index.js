@@ -4,4 +4,5 @@ module.exports = {
 	...require('./teamFeatured'),
 	...require('./teamTag'),
 	...require('./teamMember'),
+	...require('./teamQuery'),
 };

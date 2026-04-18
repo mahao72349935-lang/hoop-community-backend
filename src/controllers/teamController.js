@@ -84,3 +84,15 @@ exports.getAllTeams = async (req, res, next) => {
 		next(err);
 	}
 };
+
+// 获取精选球队列表
+// @route   GET /api/v1/teams/featured
+// @access  Private
+exports.getFeaturedTeams = async (req, res, next) => {
+	try {
+		const teams = await teamService.getFeatured();
+		return ok(res, teams, '获取精选球队列表成功');
+	} catch (err) {
+		next(err);
+	}
+};

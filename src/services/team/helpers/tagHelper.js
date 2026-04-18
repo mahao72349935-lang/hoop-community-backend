@@ -13,16 +13,16 @@ const computeSystemTags = (team) => {
 	const updated = new Date(team.updatedAt).getTime();
 
 	if (now - created <= SEVEN_DAYS_MS) {
-		tags.push({ key: 'new', label: '新球队', emoji: '🆕' });
+		tags.push({ key: 'new', label: '新球队' });
 	}
 	if (now - updated <= THIRTY_DAYS_MS) {
-		tags.push({ key: 'active', label: '最近活跃', emoji: '⚡' });
+		tags.push({ key: 'active', label: '最近活跃' });
 	}
 	if (team.stats?.totalMatches >= 10) {
-		tags.push({ key: 'frequent', label: '常打球', emoji: '🔥' });
+		tags.push({ key: 'frequent', label: '常打球' });
 	}
 	if ((team.members?.length || 0) < 15) {
-		tags.push({ key: 'recruiting', label: '还招人', emoji: '👋' });
+		tags.push({ key: 'recruiting', label: '还招人' });
 	}
 	return tags;
 };
@@ -32,8 +32,8 @@ const computeSystemTags = (team) => {
  */
 const attachTags = (team) => {
 	const obj = team.toJSON ? team.toJSON() : team;
-	obj.systemTags = computeSystemTags(obj);
-	obj.allTags = [...obj.systemTags, ...(obj.displayTags || [])];
+	const systemTags = computeSystemTags(obj);
+	obj.allTags = [...systemTags, ...(obj.displayTags || [])];
 	return obj;
 };
 

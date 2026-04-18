@@ -8,6 +8,7 @@ router.use(protect); // 所有路由都需要登录
 router.get('/joined', teamController.getJoinedTeamList);
 router.post('/', teamController.createTeam);
 router.get('/', teamController.getAllTeams);
+router.get('/featured', teamController.getFeaturedTeams);
 router.get('/:teamId', teamController.getTeamDetail);
 router.patch('/:teamId', teamController.updateTeam);
 router.delete('/:teamId', teamController.deleteTeam);

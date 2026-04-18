@@ -71,8 +71,10 @@ exports.remove = async ({ userId, teamId }) => {
 };
 
 // ─── 球队详情 ───────────────────────────────────
-exports.getDetail = async ({ userId, teamId }) => {
-	const { team } = await assertTeamMember({ teamId, userId });
+exports.getDetail = async ({ teamId }) => {
+	if (!teamId) throw new Error('teamId不能为空');
+	const team = await Team.findById(teamId);
+	if (!team) throw new Error('球队不存在');
 	await team.populate([
 		{ path: 'members.user', select: 'nickname avatar' },
 		{ path: 'nicknames.targetUser', select: 'nickname avatar' },
